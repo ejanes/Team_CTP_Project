@@ -7,6 +7,9 @@ const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const cookieParser = require('cookie-parser');
 const { getDB } = require('./db');
+const { ObjectId } = require('mongodb');
+const escape = require('escape-html');
+
 
 app.use(express.static('public'));
 app.use(express.json());
@@ -120,4 +123,56 @@ app.get('/check-login', async (req, res) => {
         console.error('error3', error);
         res.status(400).json({ loggedIn: false, message: 'C failed' });
     }
-});
+}); //check
+
+
+app.post('/posts', async (req, res) => {
+    const db = getDB();
+    const { username } = req.body;
+    let { content } = req.body; 
+    content = escape(content);
+
+    const timestamp = new Date().toISOString().replace(/T/, ' ').replace(/\..+/, '');
+
+
+    const newPost = {
+        username,
+        content,
+        timestamp,
+        likes: [],
+    };
+
+    await db.collection('posts').insertOne(newPost);
+    res.status(201).json({ message: 'p success' });
+}); //create a post
+
+app.get('/posts', async (req, res) => {
+    const db = getDB();
+    const posts = await db.collection('posts').find({}).toArray();
+    res.status(200).json(posts);
+}); //push the posts
+
+app.post('/posts/like', async (req, res) => {
+    const db = getDB();
+    const { postId, username } = req.body;
+
+    if (!username) {
+        return res.status(400).json({ message: 'user not found' });
+    }
+
+    const updated = await db.collection('posts').updateOne(
+        { _id: ObjectId.createFromHexString(postId) },
+        { $addToSet: { 'likes': username } }
+    );
+
+    if (updated.matchedCount === 0) {
+        return res.status(400).json({ message: 'post not found' });
+    }
+
+    if (updated.modifiedCount === 0) {
+        return res.status(400).json({ message: 'You have already reacted to this post' });
+    }
+
+    res.status(200).json({ message: 'l success' });
+}); //like
+

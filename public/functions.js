@@ -72,7 +72,7 @@ function handleLogin(event) {
         localStorage.setItem('username', username);
         document.getElementById('loginUsername').value = '';
         document.getElementById('loginPassword').value = '';
-        checkLogin()
+        updateUI()
     })
     .catch(error => {
         console.error('L faild', error);
@@ -81,21 +81,6 @@ function handleLogin(event) {
     });
 }
 
-
-function updateUI(username) {
-    const loginSection = document.getElementById('loginForm'); 
-    const registerSection = document.getElementById('registerForm');
-    const userSection = document.getElementById('userSection'); 
-
-    loginSection.style.display = 'none'; 
-    registerSection.style.display = 'none';
-    userSection.style.display = 'block'; 
-
-    userSection.innerHTML = `
-        <p>Welcome, ${username}!</p>
-        <button onclick="handleLogout()">Log Out</button>
-    `;
-}
 
 function handleLogout() {
     const username = localStorage.getItem('username');
@@ -109,6 +94,8 @@ function handleLogout() {
         if (!response.ok) {
             throw new Error('Lo faild');
         } else {
+            localStorage.removeItem('username');
+
             const loginSection = document.getElementById('loginForm');
             const registerSection = document.getElementById('registerForm');
             const userSection = document.getElementById('userSection');
@@ -139,22 +126,133 @@ function initializeFormHandlers() {
 
 
 function checkLogin() {
-    fetch('/check-login', {
+    return fetch('/check-login', {
         credentials: 'include'  
     })
     .then(response => response.json())
     .then(data => {
         if (data.loggedIn) {
-            console.log('Loggined', data.username);
-            updateUI(data.username);
+            console.log('Logged in', data.username);
+            return data.username;  
         } else {
-            console.log('not Loggined', data.message);
+            console.log('Not logged in', data.message);
+            return null;  
         }
     })
-    .catch(error => console.error('error2', error));
+    .catch(error => {
+        console.error('Error', error);
+        return null;  
+    });
 }
 
 
-document.addEventListener('DOMContentLoaded', initializeFormHandlers);
-document.addEventListener("DOMContentLoaded", checkLogin);
+function updateUI() {
+    checkLogin().then(username => {
+        const loginSection = document.getElementById('loginForm'); 
+        const registerSection = document.getElementById('registerForm');
+        const userSection = document.getElementById('userSection'); 
 
+        if (username) {
+            loginSection.style.display = 'none'; 
+            registerSection.style.display = 'none';
+            userSection.style.display = 'block'; 
+            userSection.innerHTML = `<p>Welcome, ${username}!</p><button onclick="handleLogout()">Log Out</button>`;
+        } else {
+            loginSection.style.display = 'block'; 
+            registerSection.style.display = 'block';
+            userSection.style.display = 'none';
+            userSection.innerHTML = '';
+        }
+    });
+}
+
+
+function handlepost(event) {
+    event.preventDefault();
+    const content = document.getElementById('postContent').value;
+
+    fetch('/check-login', { credentials: 'include' })
+    .then(response => response.json())
+    .then(data => {
+        const username = data.loggedIn ? data.username : 'Guest';
+        go_to_post(content, username);
+    })
+    .catch(error => console.error('Error', error));
+}
+
+function go_to_post(content, username) {
+    fetch('/posts', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({username, content})
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log('P success', data);
+        fetchPosts(); 
+        document.getElementById('postContent').value = ''; 
+    })
+    .catch(error => {
+        console.error('P failed', error);
+    });
+}
+
+
+function fetchPosts() {
+    fetch('/posts')
+    .then(response => response.json())
+    .then(posts => {
+        const postsSection = document.getElementById('postsSection');
+        postsSection.innerHTML = ''; 
+        posts.forEach(post => {
+            const postElement = document.createElement('div');
+            postElement.innerHTML = `
+                <p>${post.username}: ${post.content} (Posted on: ${post.timestamp})</p>
+                <button onclick="handleLike('${post._id}')">Like (${post.likes.length})</button>
+            `;
+            postsSection.appendChild(postElement);
+        });
+    })
+    .catch(error => {
+        console.error('fp failed', error);
+    });
+}
+
+
+function handleLike(postId) {
+    checkLogin().then(username => {
+        if (!username) {
+            console.log('not login');
+            return;
+        }
+
+        fetch('/posts/like', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ postId, username })
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log(data.message);
+            fetchPosts(); 
+        })
+        .catch(error => console.error('Like failed', error));
+    });
+}
+
+function initializePostHandlers() {
+    const postForm = document.getElementById('postForm');
+    if (postForm) {
+        postForm.addEventListener('submit', handlepost);
+    }
+}
+
+
+
+
+document.addEventListener("DOMContentLoaded", updateUI);
+document.addEventListener('DOMContentLoaded', () => {
+    initializeFormHandlers();
+    initializePostHandlers();
+    fetchPosts(); 
+});
