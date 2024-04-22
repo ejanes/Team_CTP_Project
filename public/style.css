@@ -15,3 +15,24 @@ header {
 main {
     padding: 20px;
 }
+
+
+img.uploaded-media,
+video.uploaded-media,
+audio.uploaded-media {
+  max-width: 500px;
+  height: auto; 
+  display: block; 
+}
+
+audio.uploaded-media {
+  width: 100%; 
+}
+
+#loginPrompt {
+    display: none;
+}
+
+#postsSection, #postForm {
+    display: none;
+}

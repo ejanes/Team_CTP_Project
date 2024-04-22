@@ -13,11 +13,18 @@
     </header>
     <main>
         <section>
+            <div id="loginPrompt">You must log in to use the page features.</div>
 
             <div id="postsSection"></div>
 
             <form id="postForm">
                 <textarea id="postContent" placeholder="Post anything here" required></textarea>
+                <input type="file" id="postMedia" multiple accept="image/*,video/*,audio/*">
+                <input type="number" id="startingBid" placeholder="Starting Bid ($)" required>
+                <select id="auctionDuration">
+                    <option value="24">24 Hours</option>
+                    <option value="48">48 Hours</option>
+                </select>
                 <button type="submit">Post</button>
             </form>
 
