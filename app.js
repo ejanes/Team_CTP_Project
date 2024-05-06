@@ -11,6 +11,8 @@ const { getDB } = require('./db');
 const { ObjectId } = require('mongodb');
 const escape = require('escape-html');
 const multer = require('multer');
+const rateLimit = require('express-rate-limit');
+
 const storage = multer.diskStorage({
     destination: function(req, file, cb) {
         cb(null, 'uploads/') 
@@ -20,8 +22,20 @@ const storage = multer.diskStorage({
     }
 });
 
+const limiter = rateLimit({
+  windowMs: 10 * 1000,  
+  max: 50,  
+  standardHeaders: true,  
+  legacyHeaders: false,  
+  handler: function (req, res, /*next*/) {  
+      res.status(429).json({
+          message: "Due to DOS protection, your request has been restricted. Please try again after 30 seconds."
+      });
+  }
+});
 
 const upload = multer({ storage: storage });
+app.use(limiter);
 app.use(express.static('public'));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use(express.json());
@@ -100,7 +114,7 @@ app.post('/register', async (req, res) => {
       salt
     });
   
-    res.status(201).send('R success');
+    res.status(201).json({ message: 'R success'});
   });// register
 
 app.post('/login', async (req, res) => {
@@ -177,7 +191,8 @@ app.post('/posts', upload.single('media'), async (req, res) => {
     content = escape(content);
     const file = req.file;
 
-    const auctionDuration = parseInt(req.body.auctionDuration);
+    let auctionDuration = parseInt(req.body.auctionDuration);
+    // auctionDuration = 1/60;
     const endTime = new Date().getTime() + auctionDuration * 60 * 60 * 1000;
 
 
@@ -191,8 +206,18 @@ app.post('/posts', upload.single('media'), async (req, res) => {
         currentBid: parseFloat(startingBid).toFixed(2),
         currentBidUser: null,
     };
+    
+    const result = await db.collection('posts').insertOne(newPost);
+    const postId = result.insertedId;
 
-    await db.collection('posts').insertOne(newPost);
+    setTimeout(async () => {
+      const deleteResult = await db.collection('posts').deleteOne({ _id: postId });
+      if (deleteResult.deletedCount > 0) {
+          broadcastPostDeletion(postId);
+      }
+      console.log(`Post ${postId} deleted after ${auctionDuration} hours`);
+    }, auctionDuration * 60 * 60 * 1000);
+
     res.status(201).json({ message: 'p success' });
 }); //create a post
 
@@ -202,29 +227,34 @@ app.get('/posts', async (req, res) => {
     res.status(200).json(posts);
 }); //push the posts
 
-// app.post('/posts/like', async (req, res) => {
-//     const db = getDB();
-//     const { postId, username } = req.body;
+app.delete('/delete-account', async (req, res) => {
+  try {
+      const { username } = req.body; 
+      const db = getDB(); 
+      const userCollection = db.collection('users');
+      const postsCollection = db.collection('posts');
 
-//     if (!username) {
-//         return res.status(400).json({ message: 'user not found' });
-//     }
+      const postsToDelete = await postsCollection.find({ username: username }).toArray();
+      postsToDelete.forEach(post => {
+          broadcastPostDeletion(post._id);
+      });
+      const deleteUserResult = await userCollection.deleteOne({ username: username });
+      const deletePostsResult = await postsCollection.deleteMany({ username: username });
 
-//     const updated = await db.collection('posts').updateOne(
-//         { _id: ObjectId.createFromHexString(postId) },
-//         { $addToSet: { 'likes': username } }
-//     );
+      if (deleteUserResult.deletedCount > 0) {
+          res.status(200).json({ message: 'Your information has been successfully deleted' });
+      } else {
+          res.status(404).json({ message: 'Failed' });
+      }
+  } catch (error) {
+      console.error('Failed:', error);
+      res.status(500).json({ message: 'server Failed' });
+  }
+});
 
-//     if (updated.matchedCount === 0) {
-//         return res.status(400).json({ message: 'post not found' });
-//     }
 
-//     if (updated.modifiedCount === 0) {
-//         return res.status(400).json({ message: 'You have already reacted to this post' });
-//     }
 
-//     res.status(200).json({ message: 'l success' });
-// }); //like
+
 
 function broadcastNewBid(message) {
     wss.clients.forEach(function each(client) {
@@ -238,3 +268,40 @@ function broadcastNewBid(message) {
       }
     });
   }
+
+function broadcastCountdownUpdate(message) {
+  wss.clients.forEach(function each(client) {
+      if (client.readyState === WebSocket.OPEN) {
+          client.send(JSON.stringify({
+              type: 'updateCountdown',
+              postId: message.postId,
+              endTime: message.endTime
+          }));
+      }
+  });
+}
+
+function broadcastPostDeletion(postId) {
+  wss.clients.forEach(function each(client) {
+      if (client.readyState === WebSocket.OPEN) {
+          client.send(JSON.stringify({
+              type: 'deletePost',
+              postId: postId
+          }));
+      }
+  });
+}
+
+
+setInterval(async () => {
+  const db = getDB();
+  const posts = await db.collection('posts').find({}).toArray();
+  posts.forEach(post => {
+      broadcastCountdownUpdate({
+          postId: post._id,
+          endTime: post.endTime
+      });
+  });
+}, 1000);
+
+

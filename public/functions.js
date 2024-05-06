@@ -5,9 +5,6 @@ function updateClock() {
     const now = new Date();
     const nowInEST = new Date(now.getTime() + (now.getTimezoneOffset() - 4 * 60) * 60000);
     let hrs = nowInEST.getHours().toString().padStart(2, '0');
-    if (hrs > 12){
-        hrs = hrs-12;
-    }
     let mins = nowInEST.getMinutes().toString().padStart(2, '0');
     let secs = nowInEST.getSeconds().toString().padStart(2, '0');
     document.getElementById('clock').textContent = hrs + ':' + mins + ':' + secs;
@@ -150,12 +147,14 @@ function updateUI() {
         const postsSection = document.getElementById('postsSection');
         const postForm = document.getElementById('postForm');
         const loginPrompt = document.getElementById('loginPrompt');
+        const header = document.getElementById('userHeader');
 
         if (username) {
             loginSection.style.display = 'none'; 
             registerSection.style.display = 'none';
             userSection.style.display = 'block'; 
-            userSection.innerHTML = `<p>Welcome, ${username}!</p><button onclick="handleLogout()">Log Out</button>`;
+            userSection.innerHTML = `<p>Welcome, ${username}!</p>`;
+            header.style.display = 'block';
             loginPrompt.style.display = 'none';
             postsSection.style.display = 'block';
             postForm.style.display = 'block';
@@ -165,6 +164,7 @@ function updateUI() {
             registerSection.style.display = 'block';
             userSection.style.display = 'none';
             userSection.innerHTML = '';
+            header.style.display = 'none';
             loginPrompt.style.display = 'block';
             postsSection.style.display = 'none';
             postForm.style.display = 'none';
@@ -227,13 +227,17 @@ function fetchPosts() {
         postsSection.innerHTML = ''; 
         posts.forEach(post => {
             const postElement = document.createElement('div');
+            postElement.id = `post-${post._id}`
+            postElement.className = 'post-container';
             const countdownTimer = calculateCountdown(post.endTime);
 
             if (typeof post.currentBid === 'string') {
                 post.currentBid = parseFloat(post.currentBid);
             }
 
-            postElement.innerHTML = `<p>${post.username}: ${post.content} (Time left: ${countdownTimer})</p>`;
+            postElement.innerHTML = `
+            <p>Time left: <span id="countdown-${post._id}">${countdownTimer}</span></p>
+            <p>${post.username}: ${post.content}</p>`;  
 
             if (post.mediaPath) {
                 if (post.mediaPath.includes('.mp4')) {
@@ -248,10 +252,9 @@ function fetchPosts() {
             postElement.innerHTML += `
                 <p>Current bid: $<span id="currentBid-${post._id}">${post.currentBid.toFixed(2)}</span></p>
                 <p>By: <span id="currentBidUser-${post._id}">${post.currentBidUser || 'Starting bid'}</span></p>
-                <button onclick="placeBid('${post._id}')">Bid ($<span id="bidIncrement-${post._id}">${minIncrease(post.currentBid, '1')}</span>)</button>
+                <button onclick="placeBid('${post._id}')"class="small-button">Bid ($<span id="bidIncrement-${post._id}">${minIncrease(post.currentBid, '1')}</span>)</button>
                 <input type="number" id="customBid-${post._id}" placeholder="Enter custom bid" min="${minIncrease(post.currentBid, '2')}">
-                <button onclick="placeCustomBid('${post._id}')">Custom Bid</button>
-                <p>(Websocket feature)</p>`;
+                <button onclick="placeCustomBid('${post._id}')" class="small-button">Custom Bid</button>`;
             postsSection.appendChild(postElement);
         });
     })
@@ -260,27 +263,6 @@ function fetchPosts() {
     });
 }
 
-
-// function handleLike(postId) {
-//     checkLogin().then(username => {
-//         if (!username) {
-//             console.log('not login');
-//             return;
-//         }
-
-//         fetch('/posts/like', {
-//             method: 'POST',
-//             headers: {'Content-Type': 'application/json'},
-//             body: JSON.stringify({ postId, username })
-//         })
-//         .then(response => response.json())
-//         .then(data => {
-//             console.log(data.message);
-//             fetchPosts(); 
-//         })
-//         .catch(error => console.error('Like failed', error));
-//     });
-// }
 
 function initializePostHandlers() {
     const postForm = document.getElementById('postForm');
@@ -318,6 +300,16 @@ function wsupgrade() {
           if (customBidInput) {
             customBidInput.min = minIncrease(parseFloat(message.newBid), '4');
           }
+        } else if (message.type === 'updateCountdown') {
+            const countdownElement = document.getElementById(`countdown-${message.postId}`);
+            if (countdownElement) {
+                countdownElement.textContent = calculateCountdown(message.endTime);
+            }
+        } else if (message.type === 'deletePost') {
+            const postElement = document.getElementById(`post-${message.postId}`);
+            if (postElement) {
+                postElement.remove();  
+        }
         }
       } catch (error) {
         console.error('Error parsing message from server:', error);
@@ -335,8 +327,9 @@ function calculateCountdown(endTime) {
     const timeLeft = endTime - now;
     let hours = Math.floor(timeLeft / (1000 * 60 * 60));
     let minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
   
-    return `${hours}h ${minutes}m`;
+    return `${hours}h ${minutes}m ${seconds}s`;
   }
 
 
@@ -382,6 +375,55 @@ function placeCustomBid(postId) {
     }));
 }
 
+document.getElementById('userHeader').addEventListener('mouseenter', function() {
+    document.getElementById('dropdownContent').style.display = 'block';
+});
+
+
+document.getElementById('dropdownContent').addEventListener('mouseenter', function() {
+    document.getElementById('dropdownContent').style.display = 'block';
+});
+
+document.getElementById('dropdownContent').addEventListener('mouseleave', function() {
+    setTimeout(function() {
+        document.getElementById('dropdownContent').style.display = 'none';
+    }, 1000); 
+});
+
+document.getElementById('signOut').addEventListener('click', function() {
+    handleLogout();
+});
+
+document.getElementById('deleteAccount').addEventListener('click', function() {
+    if (confirm('Are you sure you want to delete your account? This operation is irreversible!！')) {
+        const username = localStorage.getItem('username');
+        handleLogout();
+        fetch('/delete-account', {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ username: username })
+        })
+        .then(response => response.json())
+        .then(data => {
+            alert(data.message); 
+            window.location.href = 'localhost:8080'; 
+        })
+        .catch(error => {
+            console.error('Faile:', error);
+        });
+    }
+});
+
+window.onload = function() {
+    if (checkLoggedIn()) {
+        
+    }
+};
+
+
+
 
 
 document.addEventListener("DOMContentLoaded", updateUI);
@@ -390,4 +432,3 @@ document.addEventListener('DOMContentLoaded', () => {
     initializePostHandlers();
     fetchPosts(); 
 });
-

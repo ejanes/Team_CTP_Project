@@ -2,48 +2,58 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Interactive Web App</title>
+    <title>UB community used supplies trading platform</title>
     <link rel="stylesheet" href="/style.css">
 </head>
 <body>
     <header>
-        <img src="/banner.jpg" alt="Banner Image">
-        <h1>Interactive Web App</h1>
-        <div id="clock"></div></div>
+        <img src="/bg.png" alt="header img">
+        <div id="clock"></div>
     </header>
-    <main>
-        <section>
-            <div id="loginPrompt">You must log in to use the page features.</div>
 
-            <div id="postsSection"></div>
+    <div id="mainContent">
+        <div id="loginPrompt">
+            You must log in to use the page features
+        </div>
 
-            <form id="postForm">
-                <textarea id="postContent" placeholder="Post anything here" required></textarea>
-                <input type="file" id="postMedia" multiple accept="image/*,video/*,audio/*">
-                <input type="number" id="startingBid" placeholder="Starting Bid ($)" required>
-                <select id="auctionDuration">
-                    <option value="24">24 Hours</option>
-                    <option value="48">48 Hours</option>
-                </select>
-                <button type="submit">Post</button>
-            </form>
+        <div id="postsSection"></div>
 
-            <form id="loginForm">
-                <input type="text" id="loginUsername" placeholder="username" required>
-                <input type="password" id="loginPassword" placeholder="password" required>
-                <button type="submit">Login</button>
-            </form>
-            <form id="registerForm">
-                <input type="text" id="registerUsername" placeholder="username" required>
-                <input type="password" id="registerPassword" placeholder="password" required>
-                <input type="password" id="registerConfirmPassword" placeholder="confirmpassword" required>
-                <button type="submit">Register</button>
-            </form>
-            <div id="userSection" style="display: none;">
+        <form id="postForm">
+            <textarea id="postContent" placeholder="Post anything here" required></textarea>
+            <input type="file" id="postMedia" multiple accept="image/*,video/*,audio/*">
+            <input type="number" id="startingBid" placeholder="Starting Bid ($)" required>
+            <select id="auctionDuration">
+                <option value="24">24 Hours</option>
+                <option value="48">48 Hours</option>
+            </select>
+            <button type="submit" class="small-button">Post</button>
+        </form>
+    
+        <form id="loginForm">
+            <input type="text" id="loginUsername" placeholder="username" required>
+            <input type="password" id="loginPassword" placeholder="password" required>
+            <button type="submit">Login</button>
+        </form>
+
+        <form id="registerForm">
+            <input type="text" id="registerUsername" placeholder="username" required>
+            <input type="password" id="registerPassword" placeholder="password" required>
+            <input type="password" id="registerConfirmPassword" placeholder="confirmpassword" required>
+            <button type="submit">Register</button>
+        </form>
+    
+
+        <div id="userInfoBar">
+            <div id="userSection"></div>
+            <div class="user-menu">
+                <img src="/header.jpg" alt="User Header" id="userHeader" style="width: 50px; height: 50px;">
+                <div class="dropdown-content" id="dropdownContent" style="display: none;">
+                    <a href="#" id="signOut">Log Out</a>
+                    <a href="#" id="deleteAccount">Delete Account</a>
+                </div>
             </div>
-
-        </section>
-    </main>
+        </div>
+    </div>
     <script src="/functions.js"></script>
 </body>
 </html>
